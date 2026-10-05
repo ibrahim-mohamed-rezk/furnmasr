@@ -1,0 +1,30 @@
+# Furnmasr (فرنتشر مصر)
+
+> Furnmasr is a bilingual (Arabic / English) e-commerce store specializing in home and
+> hotel furniture (أثاث). Arabic is the primary language. The store offers modern
+> sectionals, living room sets, bedrooms, lazy boy chairs, and decor pieces with fast
+> shipping, secure checkout, and customer reviews.
+
+## Main sections
+- [Home](https://furnmasr.com/): Featured products, best sellers, flash sales, new arrivals.
+- [Shop](https://furnmasr.com/shop): Full product catalog with category and price filters.
+- [Flash Sale](https://furnmasr.com/flash-sale): Time-limited discounted products.
+- [Blogs](https://furnmasr.com/blogs): Articles about furniture, interior styling, and caring for your pieces.
+- [Contact](https://furnmasr.com/contact): Store contact form and location.
+
+## Product categories
+Living room, bedroom, dining and decor furniture. Browse live categories from the catalog at
+https://furnmasr.com/shop — each product has its own page at
+https://furnmasr.com/shop/{slug} with description, dimensions/pricing, and reviews.
+
+## Policies
+- [Privacy Policy](https://furnmasr.com/privacy)
+- [Shipping Policy](https://furnmasr.com/shipping-policy)
+- [Delivery & Shipping](https://furnmasr.com/delivery-and-shipping)
+- [Refund Policy](https://furnmasr.com/refund-policy)
+- [Refunds & Exchanges](https://furnmasr.com/refunds-and-exchanges)
+- [Exchange Policy](https://furnmasr.com/exchange-policy)
+
+## Notes
+- Languages: Arabic (default) and English.
+- Sitemap: https://furnmasr.com/sitemap.xml

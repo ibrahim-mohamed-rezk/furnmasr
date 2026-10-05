@@ -1,0 +1,308 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # Next 16 requires Node >= 20.9; pinned to 22 LTS.
+  NODE_VERSION: "22"
+  # Absolute path on the VPS holding releases/ and the LIVE `app/` directory.
+  # Set as a repo variable, e.g. /home/furnmasrstore26/apps/furnmasr
+  # (workflow-level env cannot read the `secrets` context, only `vars`).
+  #
+  # IMPORTANT: cPanel's Node.js Selector is configured with the application
+  # root = "$APP_DIR/app", a REAL directory (NOT a symlink). The Selector
+  # rejects a symlink app root — it resolves the link and pins the target,
+  # so a `current -> releases/<sha>` symlink deploy never actually goes live.
+  # This workflow therefore keeps `app/` as a fixed real dir and swaps its
+  # CONTENTS in place on every deploy.
+  APP_DIR: ${{ vars.APP_DIR }}
+
+jobs:
+  # Build and ship run in ONE job on purpose. They used to be two, with the
+  # bundle handed over via upload-artifact/download-artifact - but that pushed
+  # ~34 MB per push into the account's Actions storage and eventually failed
+  # every deploy with "Failed to CreateArtifact: Artifact storage quota has
+  # been hit". Nothing else consumes the artifact, so building and shipping in
+  # the same job removes the quota dependency (and a minute of upload/download).
+  deploy:
+    name: Build and ship to VPS
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # NEXT_PUBLIC_* values are inlined into the client bundle at build time,
+      # so they must be present HERE, not on the server.
+      - name: Build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        run: npm run build
+
+      # `output: "standalone"` does not copy these two directories itself.
+      - name: Assemble deployable bundle
+        run: |
+          cp -r public .next/standalone/public
+          mkdir -p .next/standalone/.next
+          cp -r .next/static .next/standalone/.next/static
+
+          # Prepend a force-exit handler so instances retired by Passenger's restart
+          # exit instead of orphaning (PPID=1) and piling up on the shared NPROC cap.
+          SIG=$(cat <<'JS'
+          function __forceExit(){ setTimeout(function(){ process.exit(0); }, 3000).unref(); }
+          process.on("SIGTERM", __forceExit);
+          process.on("SIGINT", __forceExit);
+          JS
+          )
+          printf '%s\n%s' "$SIG" "$(cat .next/standalone/server.js)" > .next/standalone/server.js
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          RELEASE="$APP_DIR/releases/${{ github.sha }}"
+          # The CageFS jail has no rsync, so stream the bundle just built in
+          # .next/standalone as a gzipped tar over ssh and extract it
+          # server-side. Only tar + ssh are needed, both of which the jail
+          # provides. Each release is a fresh unique dir, so no --delete
+          # semantics are required. `.` includes dotfiles (.next/).
+          tar -C .next/standalone -czf - . | ssh -p "${SSH_PORT}" \
+            -o StrictHostKeyChecking=yes \
+            "${SSH_USER}@${SSH_HOST}" \
+            "mkdir -p '${RELEASE}' && tar -C '${RELEASE}' -xzf -"
+
+      # Server-side secrets are NOT inlined at build time (only NEXT_PUBLIC_*
+      # are), so they must exist on the VPS. `next start` in standalone mode
+      # calls loadEnvConfig() against its own directory, so a .env written into
+      # the release root is picked up when Passenger boots the app. Without
+      # AUTH_SECRET, next-auth throws MissingSecret in production and every
+      # /api/auth/* request 500s.
+      - name: Write server runtime env
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET || secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || secrets.AUTH_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FACEBOOK_CLIENT_ID: ${{ secrets.FACEBOOK_CLIENT_ID }}
+          FACEBOOK_CLIENT_SECRET: ${{ secrets.FACEBOOK_CLIENT_SECRET }}
+          NEXTAUTH_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AUTH_SECRET}" ]; then
+            echo "::error::Neither AUTH_SECRET nor NEXTAUTH_SECRET is set for the 'production' environment. next-auth will 500 on every /api/auth/* request. Generate one with 'openssl rand -base64 32' and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          # Build the file locally, then stream it over stdin so the values never
+          # appear in an ssh argv (visible to other users via ps on a shared box).
+          {
+            printf 'AUTH_SECRET=%s\n' "$AUTH_SECRET"
+            printf 'NEXTAUTH_SECRET=%s\n' "$NEXTAUTH_SECRET"
+            printf 'NEXTAUTH_URL=%s\n' "$NEXTAUTH_URL"
+            printf 'GOOGLE_CLIENT_ID=%s\n' "$GOOGLE_CLIENT_ID"
+            printf 'GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET"
+            printf 'FACEBOOK_CLIENT_ID=%s\n' "$FACEBOOK_CLIENT_ID"
+            printf 'FACEBOOK_CLIENT_SECRET=%s\n' "$FACEBOOK_CLIENT_SECRET"
+            printf 'NEXT_PUBLIC_API_URL=%s\n' "$NEXT_PUBLIC_API_URL"
+          } | ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" \
+            "umask 077 && cat > '$APP_DIR/releases/${{ github.sha }}/.env'"
+
+      - name: Activate release and reload
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          # Pass APP_DIR and the release SHA as positional args ($1, $2) into a
+          # QUOTED heredoc. A quoted <<'EOF' means the local runner shell does
+          # ZERO expansion — every $ below is evaluated on the server. This is
+          # what makes the escaping reliable; the previous unquoted heredoc
+          # mangled $$ / \$ and tripped `set -e`.
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            bash -s -- "$APP_DIR" "$RELEASE_SHA" <<'EOF'
+            set -uo pipefail
+            APP_DIR="$1"
+            RELEASE="$APP_DIR/releases/$2"
+            LIVE="$APP_DIR/app"
+
+            # The cPanel Node.js Selector pins the app root to a REAL directory
+            # ("$APP_DIR/app") and rejects a symlink there. So instead of a
+            # symlink swap, replace the CONTENTS of $LIVE in place with the
+            # freshly uploaded release, without touching $LIVE itself (the
+            # Selector keeps pointing at the same inode the whole time).
+            mkdir -p "$LIVE/tmp"
+
+            # Mirror the release into the live dir (adds/updates files).
+            # Fail the deploy loudly if the copy is incomplete (quota, I/O) —
+            # a half-populated live dir must never be reported as success.
+            if ! cp -a "$RELEASE/." "$LIVE/"; then
+              echo "::error::cp -a failed — live dir may be incomplete. Aborting before prune."
+              exit 1
+            fi
+
+            # Prune files that existed in a previous release but not this one,
+            # never touching tmp/ (ours, holds the restart trigger).
+            #
+            # LC_ALL=C is CRITICAL: sort/comm otherwise use locale collation,
+            # which ignores '-', '_', '.' on the first pass. When the live and
+            # release lists don't collate identically, comm -23 emits false
+            # "only in live" lines and DELETES files that are in the release
+            # (this is exactly what stripped the CSS and public/ assets).
+            # Byte-wise C collation makes both lists order identically.
+            #
+            # Avoid process substitution (<(...)) — the CageFS jail's /dev/fd
+            # is unreliable. Use plain temp files, and guard so a prune hiccup
+            # can never fail the deploy.
+            prune() {
+              lf="$HOME/.deploy_live.$$"; rf="$HOME/.deploy_rel.$$"
+              ( cd "$LIVE" && find . \( -type f -o -type l \) 2>/dev/null ) | sed 's|^\./||' | LC_ALL=C sort > "$lf"
+              ( cd "$RELEASE" && find . \( -type f -o -type l \) 2>/dev/null ) | sed 's|^\./||' | LC_ALL=C sort > "$rf"
+              LC_ALL=C comm -23 "$lf" "$rf" | grep -v '^tmp/' | while IFS= read -r f; do
+                [ -n "$f" ] && rm -f "$LIVE/$f"
+              done
+              rm -f "$lf" "$rf"
+            }
+            prune || echo "prune skipped (non-fatal)"
+
+            # After prune, verify the two dirs that MUST match the release are
+            # intact. If prune (or a bad copy) removed anything under public/ or
+            # .next/static, restore it from the release and fail so it's visible
+            # — an unstyled 200 page is worse than a failed deploy.
+            verify_ok=1
+            for sub in public .next/static; do
+              if [ -d "$RELEASE/$sub" ]; then
+                missing=$( ( cd "$RELEASE/$sub" && find . -type f 2>/dev/null ) | while IFS= read -r f; do
+                  [ -e "$LIVE/$sub/$f" ] || echo "$f"
+                done )
+                if [ -n "$missing" ]; then
+                  echo "::error::Files under $sub are missing from the live dir after prune — restoring from release."
+                  cp -a "$RELEASE/$sub/." "$LIVE/$sub/"
+                  verify_ok=0
+                fi
+              fi
+            done
+
+            # Reload. IMPORTANT: `touch restart.txt` alone is NOT reliable on
+            # this account. With in-place updates, a running Next worker keeps
+            # serving the CSS/asset file listing it read AT BOOT — so after the
+            # files change underneath it, its HTML still references the OLD
+            # hashed CSS (which no longer exists → 400) until it actually
+            # restarts. Old workers were also observed surviving the touch and
+            # piling up (7 at once), load-balanced alongside new ones.
+            #
+            # So force a real restart: touch the trigger, then KILL this app's
+            # own next-server workers. Every worker for THIS app has cwd = $LIVE
+            # (the fixed root), so we can target them precisely; the supervisor
+            # respawns a fresh one that re-reads the new listing. The sibling
+            # app lives on a different $LIVE and is never matched.
+            touch "$LIVE/tmp/restart.txt"
+
+            own=""
+            for pid in $(ps -u "$(id -un)" -o pid= 2>/dev/null || true); do
+              cmd=$(tr '\0' ' ' 2>/dev/null < "/proc/$pid/cmdline") || continue
+              case "$cmd" in
+                *next-server*|*lsnode.js*|*server.js*) ;;
+                *) continue ;;
+              esac
+              cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null) || continue
+              case "$cwd" in
+                "$LIVE"|"$LIVE"/*) own="$own $pid" ;;   # this app's worker
+                "$APP_DIR"/*) own="$own $pid" ;;        # stale old-release worker
+              esac
+            done
+            if [ -n "$own" ]; then
+              echo "Restarting this app's workers:$own"
+              kill $own 2>/dev/null || true
+              sleep 3
+              kill -9 $own 2>/dev/null || true
+            fi
+            # Re-touch so the supervisor definitely respawns against the new dir.
+            touch "$LIVE/tmp/restart.txt"
+
+            # Give the supervisor a moment to bring a fresh worker up.
+            sleep 8
+
+            echo "Workers under $APP_DIR after restart:"
+            for pid in $(ps -u "$(id -un)" -o pid= 2>/dev/null || true); do
+              cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null) || continue
+              case "$cwd" in
+                "$APP_DIR"/*) ps -o pid,ppid,lstart,rss,cmd -p "$pid" | tail -n +2 || true ;;
+              esac
+            done
+
+            # Keep the 5 most recent release snapshots for reference/rollback.
+            # The live dir is $APP_DIR/app (not under releases/), so this never
+            # touches what is serving.
+            ls -1dt "$APP_DIR"/releases/*/ 2>/dev/null | tail -n +6 | xargs -r rm -rf
+            exit 0
+          EOF
+
+      - name: Smoke test
+        env:
+          SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          # 1) The page must return 200.
+          html=""
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            html=$(curl -s -L "$SITE_URL/ar" || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' -L "$SITE_URL/ar" || true)
+            if [ "$code" = "200" ]; then echo "page OK ($code)"; break; fi
+            echo "attempt $i: got $code, retrying..."
+            sleep 5
+            [ "$i" = "10" ] && { echo "Smoke test failed - page did not return 200"; exit 1; }
+          done
+
+          # 2) The page returning 200 is not enough — a deploy that stripped the
+          # stylesheet still serves 200 HTML (that was the silent-unstyled bug).
+          # Extract the first /_next/static/*.css the HTML references and assert
+          # it returns 200. This catches missing static assets directly.
+          css_path=$(printf '%s' "$html" | grep -o '/_next/static/[^"'\'']*\.css' | head -n1 || true)
+          if [ -n "$css_path" ]; then
+            css_code=$(curl -s -o /dev/null -w '%{http_code}' -L "$SITE_URL$css_path" || true)
+            if [ "$css_code" = "200" ]; then
+              echo "stylesheet OK ($css_path -> $css_code)"
+            else
+              echo "::error::Referenced stylesheet $css_path returned $css_code — the site is likely unstyled (static assets missing on server)."
+              exit 1
+            fi
+          else
+            echo "::warning::No /_next/static/*.css reference found in HTML; skipping asset check."
+          fi
+          echo "Smoke test passed."

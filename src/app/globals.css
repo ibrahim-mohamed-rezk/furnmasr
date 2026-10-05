@@ -1,0 +1,428 @@
+/* El Messiri is now self-hosted via next/font (see src/app/layout.tsx) and
+   exposed as --font-el-messiri. The old render-blocking Google Fonts @import
+   was removed to take it off the critical path. */
+@import "swiper/css";
+@import "swiper/css/navigation";
+@import "swiper/css/pagination";
+@import "swiper/css/scrollbar";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 24 14% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 24 14% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 14% 10%;
+    --primary: 25 35% 38%;             /* #836048 - walnut, primary actions */
+    --primary-light: #faf6f0;          /* cream - section tint */
+    --primary-foreground: 40 30% 98%;
+    --secondary: 25 35% 38%;
+    --secondary-foreground: 40 30% 98%;
+    --muted: 30 20% 96%;               /* warm off-white surface */
+    --muted-foreground: 25 8% 45%;
+    --accent: 30 20% 96%;
+    --accent-foreground: 24 14% 12%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 30 14% 89%;
+    --input: 30 14% 89%;
+    --ring: 25 35% 38%;
+    --radius: 0.5rem;
+    --chart-1: 25 35% 38%;             /* walnut */
+    --chart-2: 35 45% 55%;             /* brass */
+    --chart-3: 24 14% 25%;             /* dark wood */
+    --chart-4: 30 20% 72%;             /* sand */
+    --chart-5: 15 30% 48%;             /* terracotta */
+    --sidebar-background: 30 20% 98%;
+    --sidebar-foreground: 24 10% 26%;
+    --sidebar-primary: 25 35% 38%;
+    --sidebar-primary-foreground: 40 30% 98%;
+    --sidebar-accent: 30 20% 95%;
+    --sidebar-accent-foreground: 24 14% 12%;
+    --sidebar-border: 30 14% 89%;
+    --sidebar-ring: 25 35% 38%;
+  }
+
+  .dark {
+    /* Charcoal base with brass accents - warm furniture palette */
+    --background: 24 12% 8%;           /* #17140f - charcoal base */
+    --foreground: 35 15% 90%;          /* #e9e3da - warm off-white text */
+    --card: 24 12% 12%;                /* #221f19 - product/card surface */
+    --card-foreground: 35 15% 90%;
+    --popover: 24 12% 12%;
+    --popover-foreground: 35 15% 90%;
+    --primary: 35 45% 62%;             /* #cfa76b - brass accent / actions */
+    --primary-foreground: 24 20% 10%;  /* #1f1710 - text on brass */
+    --primary-light: 24 12% 11%;       /* #201d17 - section tint */
+    --secondary: 35 45% 62%;
+    --secondary-foreground: 24 20% 10%;
+    --muted: 24 10% 12%;               /* header/muted surface */
+    --muted-foreground: 33 8% 64%;     /* #a9a29a - muted text */
+    --accent: 24 12% 16%;              /* subtle warm accent */
+    --accent-foreground: 35 15% 90%;
+    --destructive: 0 51% 46%;          /* cart badge red */
+    --destructive-foreground: 0 0% 98%;
+    --border: 24 10% 18%;              /* hairline borders */
+    --input: 24 8% 27%;                /* input/pill borders */
+    --ring: 35 45% 62%;                /* brass focus ring */
+    --chart-1: 35 45% 62%;             /* brass */
+    --chart-2: 25 35% 52%;             /* walnut */
+    --chart-3: 35 15% 90%;             /* off-white */
+    --chart-4: 24 12% 22%;             /* dark wood */
+    --chart-5: 35 45% 45%;             /* deep brass */
+    --sidebar-background: 24 14% 6%;   /* darkest bars */
+    --sidebar-foreground: 35 15% 90%;
+    --sidebar-primary: 35 45% 62%;
+    --sidebar-primary-foreground: 24 20% 10%;
+    --sidebar-accent: 24 12% 16%;
+    --sidebar-accent-foreground: 35 15% 90%;
+    --sidebar-border: 24 10% 18%;
+    --sidebar-ring: 35 45% 62%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* RTL Support */
+  [dir="rtl"] {
+    direction: rtl;
+  }
+
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3,
+  [dir="rtl"] h4,
+  [dir="rtl"] h5,
+  [dir="rtl"] h6,
+  [dir="rtl"] p,
+  [dir="rtl"] span,
+  [dir="rtl"] a,
+  [dir="rtl"] button,
+  [dir="rtl"] input,
+  [dir="rtl"] textarea,
+  [dir="rtl"] select,
+  [dir="rtl"] option,
+  [dir="rtl"] label,
+  [dir="rtl"] div,
+  [dir="rtl"] ul,
+  [dir="rtl"] li,
+  [dir="rtl"] ol,
+  [dir="rtl"] table,
+  [dir="rtl"] tr,
+  [dir="rtl"] td,
+  [dir="rtl"] th,
+  [dir="rtl"] tbody,
+  [dir="rtl"] thead,
+  [dir="rtl"] tfoot,
+  [dir="rtl"] form,
+  [dir="rtl"] input,
+  [dir="rtl"] textarea,
+  [dir="rtl"] select,
+  [dir="rtl"] option,
+  [dir="rtl"] label,
+  [dir="rtl"] div,
+  [dir="rtl"] ul,
+  [dir="rtl"] li,
+  [dir="rtl"] ol,
+  [dir="rtl"] table,
+  [dir="rtl"] tr,
+  [dir="rtl"] td,
+  [dir="rtl"] th,
+  [dir="rtl"] tbody,
+  [dir="rtl"] thead,
+  [dir="rtl"] tfoot,
+  [dir="rtl"] form {
+    font-family: var(--font-el-messiri), "El Messiri", sans-serif !important;
+  }
+
+  [dir="rtl"] .text-left {
+    text-align: right;
+  }
+
+  [dir="rtl"] .text-right {
+    text-align: left;
+  }
+
+  [dir="rtl"] .ml-auto {
+    margin-left: unset;
+    margin-right: auto;
+  }
+
+  [dir="rtl"] .mr-auto {
+    margin-right: unset;
+    margin-left: auto;
+  }
+
+  [dir="rtl"] .pl-4 {
+    padding-left: unset;
+    padding-right: 1rem;
+  }
+
+  [dir="rtl"] .pr-4 {
+    padding-right: unset;
+    padding-left: 1rem;
+  }
+
+  [dir="rtl"] .border-l {
+    border-left: unset;
+    border-right: 1px solid;
+  }
+
+  [dir="rtl"] .border-r {
+    border-right: unset;
+    border-left: 1px solid;
+  }
+
+  /* RTL Slider Support */
+  [dir="rtl"] .swiper {
+    direction: rtl;
+  }
+
+  [dir="rtl"] .swiper-button-next {
+    transform: rotate(180deg);
+  }
+
+  [dir="rtl"] .swiper-button-prev {
+    transform: rotate(180deg);
+  }
+
+  [dir="rtl"] .swiper-pagination {
+    direction: rtl;
+  }
+
+  /* RTL Navigation Buttons */
+  [dir="rtl"] .hero-prev-button,
+  [dir="rtl"] .testimonial-prev-button,
+  [dir="rtl"] .categories-prev-button,
+  [dir="rtl"] .our-videos-prev-button,
+  [dir="rtl"] .video-reviews-prev-button,
+  [dir="rtl"] .product-gallery-prev-button {
+    transform: rotate(180deg);
+  }
+
+  [dir="rtl"] .hero-next-button,
+  [dir="rtl"] .testimonial-next-button,
+  [dir="rtl"] .categories-next-button,
+  [dir="rtl"] .our-videos-next-button,
+  [dir="rtl"] .video-reviews-next-button,
+  [dir="rtl"] .product-gallery-next-button {
+    transform: rotate(180deg);
+  }
+
+  /* RTL Swiper Wrapper */
+  [dir="rtl"] .swiper-wrapper {
+    flex-direction: row-reverse;
+    direction: ltr !important;
+  }
+
+  /* Videos + review carousels: use native Swiper direction (no double-flip) */
+  [dir="rtl"] .media-carousel-swiper .swiper-wrapper {
+    flex-direction: row !important;
+    direction: rtl !important;
+  }
+
+  [dir="ltr"] .media-carousel-swiper .swiper-wrapper {
+    flex-direction: row !important;
+    direction: ltr !important;
+  }
+
+  [dir="rtl"] .swiper-slide .card-cover {
+    direction: rtl !important;
+    text-align: right !important;
+  }
+}
+
+.swiper-slide-thumb-active .overlay {
+  background: rgba(0, 0, 0, 0.678);
+}
+
+/* Custom Animations for Error and Loading Pages */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Apply animations to error and loading page elements */
+.error-page-animate {
+  animation: slide-in-up 0.6s ease-out;
+}
+
+.loading-page-animate {
+  animation: fade-in-scale 0.8s ease-out;
+}
+
+.floating-element {
+  animation: float 3s ease-in-out infinite;
+}
+
+.shimmer-effect {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.dark .shimmer-effect {
+  background: linear-gradient(90deg, #132318 25%, #1c3322 50%, #132318 75%);
+  background-size: 200px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Smooth transitions for interactive elements */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover effects for buttons */
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Gradient text effect */
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+body {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #c9a962 #0e1610;
+  scrollbar-gutter: stable;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background-color: #0e1610;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #c9a962;
+  border-radius: 10px;
+}
+
+/* Dark mode skeleton/loading pulse uses gold tones */
+.dark .animate-pulse {
+  animation: dark-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes dark-pulse {
+  0%, 100% { opacity: 1; background-color: hsl(139 30% 11%); }
+  50%       { opacity: 0.6; background-color: hsl(140 27% 16%); }
+}
+
+/* ============================================================
+   Dark-mode adaptations for hardcoded light utility colors.
+   Components across the app hardcode a light form-field color
+   (#EDE7E0 / #F5F5F5 / #FEFAF3), black CTA buttons
+   (bg-black text-white), gray dividers and black borders.
+   These rules remap them onto the dark-green + gold palette so
+   every page reads correctly in dark mode without touching each
+   call site. Left unlayered on purpose so they win over Tailwind
+   utility classes (which live in @layer utilities); hover states
+   are declared explicitly for the same reason.
+   ============================================================ */
+
+/* Form fields & light "card" surfaces -> dark-green input surface */
+.dark .bg-\[\#EDE7E0\],
+.dark .bg-\[\#F5F5F5\],
+.dark .bg-\[\#FEFAF3\] {
+  background-color: hsl(var(--accent));
+}
+
+/* Primary CTA buttons: black -> gold with dark text */
+.dark button.bg-black,
+.dark a.bg-black {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+.dark button.bg-black:hover,
+.dark a.bg-black:hover {
+  background-color: hsl(var(--primary) / 0.9);
+}
+
+/* Ghost/outline buttons that darken on hover -> subtle green highlight */
+.dark .hover\:bg-black:hover {
+  background-color: hsl(var(--accent));
+}
+
+/* Hairline dividers */
+.dark .bg-gray-300,
+.dark .bg-gray-600 {
+  background-color: hsl(var(--border));
+}
+
+/* Black borders -> theme border */
+.dark .border-black {
+  border-color: hsl(var(--border));
+}
+
+/* In-stock status text needs a lighter green on dark backgrounds */
+.dark .text-\[\#01750E\] {
+  color: hsl(142 55% 55%);
+}
